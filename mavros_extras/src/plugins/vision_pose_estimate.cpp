@@ -36,7 +36,8 @@ class VisionPoseEstimatePlugin : public plugin::PluginBase,
 public:
 	VisionPoseEstimatePlugin() : PluginBase(),
 		sp_nh("~vision_pose"),
-		tf_rate(10.0)
+		tf_rate(10.0),
+		reset_counter(0)
 	{ }
 
 	void initialize(UAS &uas_)
@@ -60,6 +61,7 @@ public:
 			vision_sub = sp_nh.subscribe("pose", 10, &VisionPoseEstimatePlugin::vision_cb, this);
 			vision_cov_sub = sp_nh.subscribe("pose_cov", 10, &VisionPoseEstimatePlugin::vision_cov_cb, this);
 		}
+		vision_reset_sub = sp_nh.subscribe("reset", 1, &VisionPoseEstimatePlugin::reset_cb, this);
 	}
 
 	Subscriptions get_subscriptions()
@@ -73,11 +75,14 @@ private:
 
 	ros::Subscriber vision_sub;
 	ros::Subscriber vision_cov_sub;
+	ros::Subscriber vision_reset_sub;
 
 	std::string tf_frame_id;
 	std::string tf_child_frame_id;
 	double tf_rate;
 	ros::Time last_transform_stamp;
+
+	unsigned char reset_counter;
 
 	/* -*- low-level send -*- */
 	/**
@@ -121,6 +126,7 @@ private:
 		vp.roll = rpy.x();
 		vp.pitch = rpy.y();
 		vp.yaw = rpy.z();
+		vp.reset_counter = reset_counter;
 		// [[[end]]] (checksum: 2048daf411780847e77f08fe5a0b9dd3)
 
 		// just the URT of the 6x6 Pose Covariance Matrix, given
@@ -150,6 +156,10 @@ private:
 		ftf::Covariance6d cov {};	// zero initialized
 
 		send_vision_estimate(req->header.stamp, tr, cov);
+	}
+
+	void reset_cb(const std_msgs::EmptyConstPtr msg) {
+		reset_counter++;
 	}
 
 	void vision_cov_cb(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &req)
